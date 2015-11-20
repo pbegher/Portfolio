@@ -1,0 +1,442 @@
+'THE PROJECT
+
+
+
+'LOGPARSE FORMAT
+'Header: Cnt,TSM,Date,Time,HR,IP,IP3,OS,Browser,Version,Batch,Creative,Flight,AdTag,ExtPlacement,Offset,IID,URL,NoFlash,NoScript,Country,City
+'Format:  --tsm=* --datestamp=* --timestamp=* --hour=* --realip=* --realip3=*  --browser_os=* --browser_name=* --browser_ver=* --batch_id=* --creative_id=* --flight_id=* --placement=* --external_placement_id=* --offset=-7 --iid=* --realreferrer=* --noflash=* --noscript=*| sortcount
+
+'Requires two tabs in file:
+'ClicksDeDuped, BotList
+'BotList - Pull this from online; Add row count including header in D2
+
+'Row Headers - Make sure to delete empty columns
+'ImpCnt, TSM, Date, Time, HR, IP, IP3, OS, Browser, Ver, BatchID, CreativeID, FlightID, AdTag, ExtPlacement,     Offset, IID, URL, NoFlash, NoScript, Bot, <200MS
+
+
+Sub Sorterer()
+
+Dim i As Integer
+Dim RowCnt As Double
+
+'j = 1
+RowCnt = Range(Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("A1"), Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("A1").End(xlDown)).Count
+'Range(.Range("A1"), .Range("A65535").End(xlUp)).Count
+
+Range("A1").Select
+'Loop to work through columns
+For i = 1 To 17
+     
+    'Do until the down and right cell is empty
+    Do While ActiveCell.Row < RowCnt
+        Selection.End(xlDown).Select
+        ActiveCell.Offset(1, 1).Select                                                      'Move active cell DOWN 1, RIGHT 1.
+        Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(0, 20)).Select
+        Selection.Cut
+        ActiveCell.Offset(0, -1).Select
+        ActiveSheet.Paste
+        'j = ActiveCell.Value
+    Loop
+    Selection.End(xlUp).Select
+    Selection.End(xlUp).Select
+    ActiveCell.Offset(0, 1).Select
+    'j = ActiveCell.Value
+Next i
+
+End Sub
+'Once the data is sorted , check the column following the final column of data for any straggling, misaligned data. Then format columns.
+
+Sub ColumnFormater()
+    Range(Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("B2"), Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("B2").End(xlDown)).Select
+    Selection.NumberFormat = "00000"
+    Range(Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("D2"), Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("D2").End(xlDown)).Select
+    Selection.NumberFormat = "h:mm:ss;@"
+    Range(Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("K2"), Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("K2").End(xlDown)).Select
+    Selection.NumberFormat = "00000"
+End Sub
+
+'------------------------------------------------------------------------------------------------------------------------'
+
+Sub SuperScript()
+
+   Dim BotListCnt, k As Integer
+   Dim i, j, IPCnt, CurrentBatch, TempBatch, CurrentTSM, TempTSM, RangeSmall, RangeBig As Double
+   Dim CurrentIP, TempIP, CurrentIID, TempIID As String
+   
+    IPCnt = Range(Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("A1"), Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("A1").End(xlDown)).Count
+    'IPCnt = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("Z2").Value           '!!!!!!!!!!!!!!!!!!Set location on spreadsheet
+    BotListCnt = Range(Workbooks("Workbook1.xlsm").Worksheets("BotList").Range("A1"), Workbooks("Workbook1.xlsm").Worksheets("BotList").Range("A1").End(xlDown)).Count
+    'BotListCnt = Workbooks("Workbook1.xlsm").Worksheets("BotList").Range("D2").Value     '!!!!!!!!!!!!!!!!!!Set location on spreadsheet
+
+
+'------------------------------------------------------------------------------------------------------------------------'
+
+'THE SETUP
+
+
+    For i = 2 To IPCnt                             'Loop Through DeDuped IP List
+
+        CurrentIP = Worksheets("Sheet1").Range("F" & i).Value
+        CurrentTSM = Worksheets("Sheet1").Range("B" & i).Value
+        'CurrentBatch = Worksheets("Sheet1").Range("O" & i).Value
+        'CurrentIID = Worksheets("Sheet1").Range("H" & i).Value
+        ObjImpCnt = Worksheets("Sheet1").Range("A" & i).Value
+        
+        j = i - 1   'The following "Temp"s are pulled from decreasing row count, traversed in the RangeCheck Loop
+        TempIP = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("F" & j).Value
+        TempTSM = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("B" & j).Value
+        'TempBatch = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("O" & j).Value
+        'TempIID = Worksheets("Sheet1").Range("H" & j).Value
+
+        RangeBig = CurrentTSM - 5000          '!**!**! Reduced to 5 Sec range !**!**!'
+        RangeSmall = CurrentTSM - 200
+        k = 2
+
+'------------------------------------------------------------------------------------------------------------------------'
+'BOTLIST MATCHER
+
+
+        For k = 2 To BotListCnt                 'Loop Through Botlist
+            If CurrentIP >= Workbooks("Workbook1.xlsm").Worksheets("BotList").Range("A" & k).Value And _
+                CurrentIP <= Workbooks("Workbook1.xlsm").Worksheets("BotList").Range("B" & k).Value Then
+                Worksheets("Sheet1").Range("V" & i).Value = "BOT"
+            End If
+            'If k = BotListCnt And _
+            '    Worksheets("Sheet1").Range("V" & i).Value = "" Then
+            '    Worksheets("Sheet1").Range("V" & i).Value = "FALSE"
+            'End If
+        Next k
+
+'------------------------------------------------------------------------------------------------------------------------'
+'TIME WATCHER
+
+        'Simultaneous Click (MULTI), 10S (STAMINA), and 200MS (RAPID)
+        '- Cnt > 1 implies same IID&TSM. Therefore, IID is not required as a variable for this situation.
+        '-- Impressions:  This should NOT be happening and means malicious activity OR logs are being duplicated.
+        '-- Clicks:  Multiple clicks can happen on the same session (IID). Noteworthy for investigation.
+        '-10S (STAMINA):
+        '-200MS (RAPID):
+
+        'Chunk below commented out because it is easy to filter spreadsheet manually for observations > 1
+        'If ObjImpCnt > 1 Then       'This item will not spot duplicated batches because batch_id will differ and so logs will appear on seperate lines :(
+        'Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("U" & i).Value = "MULTI"   'Result:  Multi, Blank
+        'End If
+
+      Do While TempTSM > RangeSmall        'RangeBig - Replace while condition when looking at Stamina events
+        'If CurrentIP = TempIP Then
+        '  Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("U" & i).Value = "STAMINA"   'Result:  Stamina, Blank
+        'End If
+        
+        If TempTSM > RangeSmall And _
+            TempIP = CurrentIP Then
+            Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("U" & i).Value = "RAPID"   'Result:  RAPID, Blank
+        End If
+        
+        'Test for Duplicated Batches
+        'If CurrentIID = TempIID And _
+        '    CurrentBatch <> TempBatch Then
+        '        Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("W" & i).Value = "DUPE"  'Result: Dupe, Blank
+        'End If
+
+        j = j - 1
+        
+        If j < 2 Then    'Prevents failure when searching the first few rows of data and Needed because this program counts down rows.
+        Exit Do
+        End If
+
+      TempIP = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("F" & j).Value
+      TempTSM = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("B" & j).Value
+      'TempBatch = Workbooks("Workbook1.xlsm").Worksheets("Sheet1").Range("O" & j).Value
+      'TempIID = Worksheets("Sheet1").Range("H" & j).Value
+     
+      Loop
+
+'------------------------------------------------------------------------------------------------------------------------'
+
+    Next i
+End Sub
+
+'------------------------------------------------------------------------------------------------------------------------'
+
+
+Sub PivotParty()
+
+    Dim PTCache As PivotCache
+    Dim PT As PivotTable
+    Dim TempTotal As Double
+    Dim GrandTotal As Integer
+    
+    Application.ScreenUpdating = False
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    Sheets("PivotSheet").Delete
+    On Error GoTo 0
+
+    'Create Cache
+    Set PTCache = ActiveWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, _
+        SourceData:=Worksheets("Sheet1").Range("A1").CurrentRegion.Address)
+      
+    'Add Sheet for Pivot Table
+    Worksheets.Add
+    ActiveSheet.Name = "PivotSheet"
+
+    'Sample PT Settings:
+    '.PivotFields("Date").Orientation = xlPageField
+    '.PivotFields("HR").Orientation = xlColumnField
+    '.PivotFields("IP").Orientation = xlRowField
+    '.PivotFields(1).Orientation = xlDataField
+    '.AutoSort xlDescending, "Sum of ImpCnt"
+    '.DisplayFieldCaptions = False
+    
+    '1 - Cnt
+    '2 - TSM
+    '3 - Date
+    '4 - Time
+    '5 - HR
+    '6 - IP
+    '7 - IP3
+    '8 - OS
+    '9 - Browser
+    '10 - Version
+    '11 - Batch
+    '12 - Creative
+    '13 - Flight
+    '14 - AdTag
+    '15 - ExtPlaceId
+    '16 - Offset
+    '17 - IID
+    '18 - URL
+    '19 - NoFlash
+    '20 - NoScript
+    '21 - Country
+    '22 - City
+
+
+    'Table#1 - OS
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("A3"))
+    
+    With PT.PivotFields("OS")
+    .Orientation = xlRowField
+    End With
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+    End With
+    'SORTING
+    With Sheets(1)
+    '    '.PivotTables(1).Name = "PivotTable1"
+        .PivotTables(1).Name = "PT1"
+    End With
+        ActiveSheet.PivotTables("PT1").PivotFields("OS").AutoSort xlDescending, "Impressions"
+    'Alternate sorting:
+        'ActiveSheet.PivotTables("PT1").PivotFields("OS").AutoSort xlDescending, _
+            "Sum of Cnt", ActiveSheet.PivotTables("PivotTable1").PivotColumnAxis.PivotLines _
+            (1), 1
+    'END SORTING
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        '.Position = 2
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+        '.PivotFields(1).Orientation = xlDataField _
+        '.Position = 2 _
+        '.CalculatedFields = xlPercentOfTotal
+        '.DisplayFieldCaptions = False
+    End With
+ 
+'Calculations - THIS SECTION IS NO LONGER NEEDED SINCE CALCULATED FIELDS ARE FUNCTIONING IN PIVOT TABLE
+ '   GrandTotal = Range(Workbooks("Workbook1.xlsm").Worksheets("PivotSheet").Range("B4"), Workbooks("Workbook1.xlsm").Worksheets("PivotSheet").Range("B4").End(xlDown)).Count + 2
+ '   TempTotal = Workbooks("Workbook1.xlsm").Worksheets("PivotSheet").Range("B5").End(xlDown).Value
+ '   Range("C4").Value = "Percentage"
+ '   Range("C5:C" & GrandTotal).Formula = "=B5/" & TempTotal
+ '   Range("C5:C" & GrandTotal).Select
+ '   Selection.NumberFormat = "0.00%"
+    
+
+    '#Table#2 - Browser
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("E3"))
+    With PT
+        .PivotFields("Browser").Orientation = xlRowField
+    End With
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+        '.AutoSort xlDescending, "Sum of ImpCnt"
+        '.DisplayFieldCaptions = False
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT2"
+    End With
+        ActiveSheet.PivotTables("PT2").PivotFields(9).AutoSort xlDescending, "Impressions"
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+     
+    '#Table#3 - Browser + Version; !!Space for Imp and Click Percentage!!
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("I3"))
+    
+    With PT
+        .PivotFields(9).Orientation = xlRowField
+        .PivotFields(10).Orientation = xlRowField
+    End With
+    
+    With PT.PivotFields(1)
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT3"
+    End With
+        ActiveSheet.PivotTables("PT3").PivotFields(10).AutoSort xlDescending, "Impressions"
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+    
+    '#Table#4 - Hour
+       Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("O3"))
+    With PT
+        .PivotFields(3).Orientation = xlRowField
+        .PivotFields(5).Orientation = xlRowField
+    End With
+    
+    With PT.PivotFields(1)
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+        '.DisplayFieldCaptions = False
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT4"
+    End With
+        ActiveSheet.PivotTables("PT4").PivotFields(5).AutoSort xlDescending, "Impressions"
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+    
+    '#Table#5 - IP; !!Add columns: 1-Countif on raw data for ip cnt, 2-Diff, 3-Prop!!
+    'NOTE:  Raw counts mainly useful for CLICK ANALYSIS!
+       Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("S3"))
+    With PT
+        .PivotFields(6).Orientation = xlRowField
+    End With
+    
+    With PT.PivotFields(1)
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT5"
+    End With
+        ActiveSheet.PivotTables("PT5").PivotFields(6).AutoSort xlDescending, "Impressions"
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+    
+        
+    '#Table#6 - IP3; !!Add columns: 1-Countif on raw data for ip cnt, 2-Diff, 3-Prop!!
+    'NOTE:  Raw counts mainly useful for CLICK ANALYSIS!
+       Set PT = ActiveSheet.PivotTables.Add( _
+        PivotCache:=PTCache, _
+        TableDestination:=Range("Y3"))
+    With PT
+        .PivotFields(7).Orientation = xlRowField
+    End With
+    
+    With PT.PivotFields(1)
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT6"
+    End With
+        ActiveSheet.PivotTables("PT6").PivotFields(7).AutoSort xlDescending, "Impressions"
+    
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+    
+    
+    '#Table#7 - Referrers; !!Add columns: 1-Countif on raw data for ip cnt, 2-Diff, 3-Prop!!
+    'NOTE:  Raw counts mainly useful for CLICK ANALYSIS!
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PTCache, TableDestination:=Range("AE3"))
+       
+    With PT
+        .PivotFields(18).Orientation = xlRowField
+    End With
+    
+    With PT.PivotFields(1)
+        .Orientation = xlDataField
+        .Caption = "Impressions"
+    End With
+    
+    With Sheets(1)
+        .PivotTables(1).Name = "PT7"
+    End With
+        ActiveSheet.PivotTables("PT7").PivotFields(18).AutoSort xlDescending, "Impressions"
+        
+    With PT.PivotFields("Cnt")
+        .Orientation = xlDataField
+        .Caption = "PctOfTotal"
+        .Function = xlSum
+        .NumberFormat = "#0.00%"
+        .Calculation = xlPercentOfTotal
+    End With
+    
+    
+    '#Table#8 - Creative
+       Set PT = ActiveSheet.PivotTables.Add( _
+        PivotCache:=PTCache, _
+        TableDestination:=Range("AK3"))
+    With PT
+        .PivotFields(12).Orientation = xlRowField
+        .PivotFields(1).Orientation = xlDataField
+         '.AutoSort xlDescending, "Sum of ImpCnt"
+        .DisplayFieldCaptions = False
+    End With
+    
+    '#Table#9 - Flight + AdTag
+       Set PT = ActiveSheet.PivotTables.Add( _
+        PivotCache:=PTCache, _
+        TableDestination:=Range("AO3"))
+    With PT
+        .PivotFields(13).Orientation = xlRowField
+        .PivotFields(14).Orientation = xlRowField
+        .PivotFields(1).Orientation = xlDataField
+         '.AutoSort xlDescending, "Sum of ImpCnt"
+        .DisplayFieldCaptions = False
+    End With
+       
+End Sub
+

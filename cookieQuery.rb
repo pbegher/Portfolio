@@ -29,7 +29,7 @@ while i < spongeArray.length
 		#Kernel.system "curl http://localhost.spongecell.net:8080/events?visitor=#{spongeKey.to_s}>temp.log"
 		
 		#Remove this line from the final file.
-		Kernel.system 'cat temp.log | grep -v -E "\-\-_curl_\-\-" >> spongeKeyLogs2.log'
+		Kernel.system 'cat temp.log | grep -v -E "\-\-_curl_\-\-" >> spongeKeyLogs.log'
 		
 		Kernel.system 'rm temp.log'
 
